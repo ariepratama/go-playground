@@ -11,11 +11,12 @@ const EnvHzServer = "HZ_SERVER"
 const EnvHzClusterName = "HZ_CLUSTER_NAME"
 
 func main() {
+	// env hz server can be actual pod or kubernetes' service DNS
 	hzServer := os.Getenv(EnvHzServer)
 	hzClusterName := os.Getenv(EnvHzClusterName)
 
 	config := hazelcast.NewConfig()
-	config.Cluster.Network.SetAddresses(fmt.Sprintf("%s:5701", hzServer))
+	config.Cluster.Network.SetAddresses(fmt.Sprintf("%s", hzServer))
 	config.Cluster.Name = hzClusterName
 
 	ctx := context.TODO()
@@ -39,4 +40,12 @@ func main() {
 		panic(err)
 	}
 	fmt.Println("Got value: ", val)
+
+	dObjects, err := client.GetDistributedObjectsInfo(ctx)
+	if err != nil {
+		panic(err)
+	}
+	for _, d := range dObjects {
+		fmt.Println("", d.Name)
+	}
 }
