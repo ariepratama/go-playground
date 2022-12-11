@@ -2,7 +2,7 @@ package samples
 
 import (
 	"context"
-	"github.com/go-redis/redis/v9"
+	"github.com/go-redis/redis/v8"
 	"log"
 	"math/rand"
 	"sync"
