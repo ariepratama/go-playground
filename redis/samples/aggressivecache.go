@@ -97,7 +97,7 @@ func AggressiveCacheMain() {
 		panic("not expected")
 	}
 
-	populatingFinished := make(chan int, 1)
+	populatingFinished := make(chan int, 2)
 	go cachedRepo.populateCache(populatingFinished)
 	go cachedRepo.testCacheKey(populatingFinished)
 	<-populatingFinished
