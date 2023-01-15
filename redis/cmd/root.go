@@ -18,6 +18,7 @@ func init() {
 	rootCmd.AddCommand(queuesCmd)
 	rootCmd.AddCommand(taskqueuesCmd)
 	rootCmd.AddCommand(aggresiveCacheCmd)
+	rootCmd.AddCommand(serverredis1Cmd)
 }
 
 func Execute() {
