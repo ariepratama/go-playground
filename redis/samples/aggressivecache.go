@@ -11,9 +11,27 @@ type (
 	// AggCachedRepository is a repository that will not do lazy loading
 	AggCachedRepository struct {
 		redisClient *redis.Client
-		repository  *DbRepository
+		repository  Repository
+		stop        chan bool
 	}
 )
+
+// NewAggCachedRepository returns a new AggCachedRepository.
+func NewAggCachedRepository() Repository {
+	rClient := redis.NewClient(&redis.Options{
+		Addr:     "localhost:6379",
+		Password: "",
+		DB:       0,
+	})
+
+	aggCachedRespository := &AggCachedRepository{
+		redisClient: rClient,
+		repository:  NewDbRepository(),
+		stop:        make(chan bool),
+	}
+	aggCachedRespository.startBackgroundCacheRefresh()
+	return aggCachedRespository
+}
 
 // Get returns the value for the given key from the cache if it exists,
 // otherwise return empty string.
@@ -28,6 +46,37 @@ func (r AggCachedRepository) Get(key string) string {
 
 func (r AggCachedRepository) Set(key, value string) {
 	r.redisClient.Set(context.Background(), key, value, time.Minute)
+}
+
+func (r AggCachedRepository) cacheRefresh() {
+
+	fmt.Println("Starting cache refreshments...")
+	for i := 0; i < 1000; i++ {
+		// simulating latency
+		time.Sleep(time.Millisecond * 20)
+
+		// starting the loading key from database and put inside the cache
+		key := fmt.Sprintf("%d", i)
+		fmt.Printf("Refreshing cache for key: %s\n", key)
+		newVal := r.repository.Get(key)
+		r.Set(key, newVal)
+	}
+
+}
+
+func (r AggCachedRepository) startBackgroundCacheRefresh() {
+	go func() {
+		for {
+			select {
+			case <-r.stop:
+				return
+			default:
+				r.cacheRefresh()
+				fmt.Println("Waiting for 1 seconds before the next refresh......")
+				time.Sleep(time.Second * 1)
+			}
+		}
+	}()
 }
 
 func (r AggCachedRepository) populateCache(finished chan int) {
@@ -65,7 +114,8 @@ func AggressiveCacheMain() {
 	})
 	cachedRepo := &AggCachedRepository{
 		rClient,
-		repository}
+		repository,
+		make(chan bool)}
 	val := cachedRepo.Get("1")
 	if val != "" {
 		panic("not expected")
