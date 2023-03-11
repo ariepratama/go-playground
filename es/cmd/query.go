@@ -1,9 +1,14 @@
 package cmd
 
 import (
+	"context"
+	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/core/search"
+	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
 	"github.com/spf13/cobra"
 	"log"
+	"net/http"
 	"time"
 )
 
@@ -21,8 +26,15 @@ var queryCmd = &cobra.Command{
 }
 
 func query() {
-	es, _ := elasticsearch.NewDefaultClient()
-	res, _ := es.Indices.Create(indexName)
+	//es, _ := elasticsearch.NewDefaultClient()
+	es, _ := elasticsearch.NewTypedClient(elasticsearch.Config{
+		Addresses: []string{"http://localhost:9200"},
+	})
+
+	tearDown()
+	log.Println("Finished deleting index...")
+
+	res, _ := es.Indices.Create(indexName).Do(context.Background())
 	log.Printf("creating index result %v", res)
 
 	fin1 := make(chan int)
@@ -41,35 +53,74 @@ func query() {
 	log.Println("Indexing finished")
 	<-fin2
 	log.Println("Querying finished")
+
 }
 
 // periodicIndexing to index document to es
-func periodicIndexing(es *elasticsearch.Client, fin chan<- int, docs []string) {
+func periodicIndexing(es *elasticsearch.TypedClient, fin chan<- int, docs []string) {
 	log.Println("begin indexing....")
-	for id, doc := range docs {
+	for docId, doc := range docs {
 		log.Printf("Indexing doc=%s ...", doc)
-		//document := struct {
-		//	Id   int    `json:"id"`
-		//	Name string `json:"name"`
-		//}{
-		//	Id:   id,
-		//	Name: doc,
-		//}
-		//es.Index(indexName, document)
+		document := struct {
+			Id  int    `json:"id"`
+			Doc string `json:"doc"`
+		}{
+			Id:  docId,
+			Doc: doc,
+		}
+		resp, err := es.Index(indexName).
+			Request(document).
+			Do(context.Background())
+
+		if err != nil || resp.StatusCode != http.StatusOK {
+			log.Printf("Failed to create document to es: %v", err)
+			return
+		}
+
+		log.Printf("successfully index document %v", document)
+
+		//es.Index(indexName, http.Request(&es.Create.Request))
 		time.Sleep(100 * time.Millisecond)
 	}
 	fin <- 1
 
 }
 
-func periodicQuery(es *elasticsearch.Client, fin chan<- int, docs []string, docLen int) {
+func periodicQuery(es *elasticsearch.TypedClient, fin chan<- int, docs []string, docLen int) {
 	log.Printf("begin querying %v docs...", docLen)
 	queriedDoc := 0
 
 	for queriedDoc < docLen {
 		log.Printf("queriedDoc: %v query=%v", queriedDoc, docs[queriedDoc])
+
+		searchRequest := &search.Request{
+			Query: &types.Query{
+				Match: map[string]types.MatchQuery{
+					"doc": {Query: docs[queriedDoc]},
+				},
+			},
+		}
+		resp, err := es.Search().
+			Index(indexName).
+			Request(searchRequest).
+			Do(context.Background())
+
+		if err != nil || resp.StatusCode != http.StatusOK {
+			log.Printf("Cannot seach document %v", err)
+
+			time.Sleep(100 * time.Millisecond)
+			continue
+		}
+
+		log.Printf("Successfully search a document %v", resp)
 		queriedDoc += 1
 		time.Sleep(100 * time.Millisecond)
 	}
 	fin <- 1
+}
+
+func tearDown() {
+	req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:9200/%s", indexName), nil)
+	client := &http.Client{}
+	client.Do(req)
 }

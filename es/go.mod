@@ -3,7 +3,7 @@ module github.com/go-playground/es
 go 1.19
 
 require (
-	github.com/elastic/go-elasticsearch/v8 v8.0.0
+	github.com/elastic/go-elasticsearch/v8 v8.6.0
 	github.com/spf13/cobra v1.3.0
 )
 
