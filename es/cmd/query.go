@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"context"
-	"fmt"
 	"github.com/elastic/go-elasticsearch/v8"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/core/search"
 	"github.com/elastic/go-elasticsearch/v8/typedapi/types"
@@ -26,12 +25,11 @@ var queryCmd = &cobra.Command{
 }
 
 func query() {
-	//es, _ := elasticsearch.NewDefaultClient()
 	es, _ := elasticsearch.NewTypedClient(elasticsearch.Config{
 		Addresses: []string{"http://localhost:9200"},
 	})
 
-	tearDown()
+	cleanIndex(indexName)
 	log.Println("Finished deleting index...")
 
 	res, _ := es.Indices.Create(indexName).Do(context.Background())
@@ -117,10 +115,4 @@ func periodicQuery(es *elasticsearch.TypedClient, fin chan<- int, docs []string,
 		time.Sleep(100 * time.Millisecond)
 	}
 	fin <- 1
-}
-
-func tearDown() {
-	req, _ := http.NewRequest(http.MethodDelete, fmt.Sprintf("http://localhost:9200/%s", indexName), nil)
-	client := &http.Client{}
-	client.Do(req)
 }

@@ -15,6 +15,7 @@ var rootCmd = &cobra.Command{
 func init() {
 	rootCmd.AddCommand(helloCmd)
 	rootCmd.AddCommand(queryCmd)
+	rootCmd.AddCommand(asyncSearchCmd)
 }
 
 func Execute() {
