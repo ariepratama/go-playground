@@ -3,7 +3,7 @@ module asyncreq
 go 1.19
 
 require (
-	github.com/ariepratama/asyncreq v0.0.5
+	github.com/ariepratama/asyncreq v0.0.7
 	github.com/go-redis/redis/v8 v8.11.5
 )
 

@@ -6,42 +6,67 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"github.com/ariepratama/asyncreq/core"
+	"github.com/ariepratama/asyncreq/asyncreq"
 	"github.com/go-redis/redis/v8"
 	"io"
 	"io/ioutil"
+	"log"
 	"net/http"
+	"time"
+)
+
+type (
+	AsyncService struct {
+		postHandler asyncreq.PostHandler
+		getHandler  asyncreq.GetHandler
+	}
 )
 
 var (
-	redisClient *redis.Client
-	postHandler *core.RedisPostHandler
-	getHandler  *core.RedisGetHandler
+	service *AsyncService
 )
 
-func callback(request core.PostRequest) {
-	fmt.Sprintf("callback called %s...\n", request.Payload)
+func onPostRequestCompleted(ctx context.Context, request *asyncreq.PostRequest, response asyncreq.PostResponse) asyncreq.PostResponse {
+	log.Println(fmt.Sprintf("callback called %s...\n", request.Payload))
+	return response
 }
 
-func processReq(ctx context.Context, request core.PostRequest, callback core.ProcessReqFunCallback) {
-	fmt.Sprintf("processing request %s...\n", request.Payload)
+func onPostError(ctx context.Context, err error) asyncreq.PostResponse {
+	log.Println("post error...")
+
+	return asyncreq.PostResponse{}
+}
+
+func onPostRequest(ctx context.Context, request *asyncreq.PostRequest) asyncreq.PostResponse {
+	log.Println(fmt.Sprintf("processing request"))
+	time.Sleep(time.Second * 5)
+	log.Println(fmt.Sprintf("finished request"))
+	return asyncreq.PostResponse{
+		IsError:      false,
+		ErrorMessage: "",
+		RequestId:    "assafds",
+	}
 }
 
 func init() {
-	redisClient = redis.NewClient(&redis.Options{
+	redisClient := redis.NewClient(&redis.Options{
 		Addr:     "localhost:6379",
 		Password: "",
 		DB:       0,
 	})
-	postHandler = &core.RedisPostHandler{
-		RedisClient: redisClient,
-		OnPostRequest: core.OnPostRequest{
-			Callback:      callback,
-			ProcessReqFun: processReq,
+	service = &AsyncService{
+		postHandler: asyncreq.NewRedisPostHandler(
+			redisClient,
+			asyncreq.PostRequestRedisOptions{
+				Ttl: time.Second * 30,
+			},
+			onPostRequest,
+			onPostRequestCompleted,
+			onPostError,
+		),
+		getHandler: asyncreq.RedisGetHandler{
+			RedisClient: redisClient,
 		},
-	}
-	getHandler = &core.RedisGetHandler{
-		RedisClient: redisClient,
 	}
 }
 
@@ -51,12 +76,12 @@ func getRoot(responseWritter http.ResponseWriter, request *http.Request) {
 
 func asyncRequestRouter(responseWriter http.ResponseWriter, request *http.Request) {
 	if http.MethodPost == request.Method {
-		postAsyncRequest(responseWriter, request)
+		postRequestHandler(responseWriter, request)
 		return
 	}
 
 	if http.MethodGet == request.Method {
-		getAsyncRequest(responseWriter, request)
+		getRequestHandler(responseWriter, request)
 		return
 	}
 
@@ -64,7 +89,7 @@ func asyncRequestRouter(responseWriter http.ResponseWriter, request *http.Reques
 	io.WriteString(responseWriter, "http method not allowed!\n")
 }
 
-func getAsyncRequest(responseWriter http.ResponseWriter, request *http.Request) {
+func getRequestHandler(responseWriter http.ResponseWriter, request *http.Request) {
 	defer responseWriter.Header().Set("Content-Type", "application/json")
 
 	requestId := request.URL.Query().Get("request_id")
@@ -74,12 +99,12 @@ func getAsyncRequest(responseWriter http.ResponseWriter, request *http.Request) 
 		io.WriteString(responseWriter, "{\"error\": \"request id should not be empty\"}")
 		return
 	}
-	getResponse := getHandler.Do(requestId)
+	getResponse := service.getHandler.Do(requestId)
 	responseWriter.WriteHeader(http.StatusOK)
 	json.NewEncoder(responseWriter).Encode(getResponse)
 }
 
-func postAsyncRequest(responseWriter http.ResponseWriter, request *http.Request) {
+func postRequestHandler(responseWriter http.ResponseWriter, request *http.Request) {
 	defer responseWriter.Header().Set("Content-Type", "application/json")
 
 	contentBytes, err := ioutil.ReadAll(request.Body)
@@ -89,7 +114,7 @@ func postAsyncRequest(responseWriter http.ResponseWriter, request *http.Request)
 		return
 	}
 
-	postResponse := postHandler.Do(core.PostRequest{
+	postResponse := service.postHandler.Do(asyncreq.PostRequest{
 		Payload: string(contentBytes),
 	})
 
