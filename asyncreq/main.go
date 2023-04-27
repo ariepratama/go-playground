@@ -26,25 +26,25 @@ var (
 	service *AsyncService
 )
 
-func onPostRequestCompleted(ctx context.Context, request *asyncreq.PostRequest, response asyncreq.PostResponse) asyncreq.PostResponse {
-	log.Println(fmt.Sprintf("callback called %s...\n", request.Payload))
-	return response
+func onPostRequestCompleted(ctx context.Context, data asyncreq.AsyncRequestData) asyncreq.PostResponse {
+	log.Println(fmt.Sprintf("onPostRequestCompleted called %s...\n", data.RequestPayload))
+	return asyncreq.PostResponse{}
 }
 
 func onPostError(ctx context.Context, err error) asyncreq.PostResponse {
-	log.Println("post error...")
+	log.Println(fmt.Sprintf("post error... %s", err))
 
 	return asyncreq.PostResponse{}
 }
 
-func onPostRequest(ctx context.Context, request *asyncreq.PostRequest) asyncreq.PostResponse {
-	log.Println(fmt.Sprintf("processing request"))
+func onPostRequest(ctx context.Context, data *asyncreq.AsyncRequestData) asyncreq.AsyncRequestData {
+	log.Println(fmt.Sprintf("onPostRequest called..."))
 	time.Sleep(time.Second * 5)
-	log.Println(fmt.Sprintf("finished request"))
-	return asyncreq.PostResponse{
-		IsError:      false,
-		ErrorMessage: "",
-		RequestId:    "assafds",
+	response := "{}"
+	log.Println(fmt.Sprintf("onPostRequest finished %s", response))
+	return asyncreq.AsyncRequestData{
+		ResponsePayload: response,
+		IsResponseError: false,
 	}
 }
 
@@ -58,7 +58,9 @@ func init() {
 		postHandler: asyncreq.NewRedisPostHandler(
 			redisClient,
 			asyncreq.PostRequestRedisOptions{
-				Ttl: time.Second * 30,
+				//Ttl: time.Second * 30,
+				// no expiration
+				Ttl: 0,
 			},
 			onPostRequest,
 			onPostRequestCompleted,
@@ -115,7 +117,7 @@ func postRequestHandler(responseWriter http.ResponseWriter, request *http.Reques
 	}
 
 	postResponse := service.postHandler.Do(asyncreq.PostRequest{
-		Payload: string(contentBytes),
+		RequestPayload: string(contentBytes),
 	})
 
 	httpStatus := http.StatusCreated

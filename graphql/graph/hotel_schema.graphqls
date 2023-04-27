@@ -1,0 +1,24 @@
+type Hotel {
+    id: ID!
+    name: String!
+    created_at: String!
+}
+
+type Country {
+    hotels: [Hotel!]!
+}
+
+input NewHotel {
+    name: String!
+}
+
+input DeleteHotel {
+    id: ID!
+}
+
+type HotelMutation {
+    createHotel(hotel: NewHotel!): Hotel!
+    createHotels(hotels: [NewHotel!]!): [Hotel!]!
+    updateHotel(hotel: NewHotel!): Hotel!
+    deleteHotel(hotel: DeleteHotel!): Hotel!
+}
