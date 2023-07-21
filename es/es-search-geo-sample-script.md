@@ -1,4 +1,3 @@
-```
 PUT geo-index-0001
 {
   "mappings": {
@@ -78,15 +77,13 @@ GET geo-index-0001/_search
 GET geo-index-0001/_search
 {
   "query": {
-    "geo_shape": {
+    "geo_distance": {
+      "distance": "1km",
       "location": {
-        "shape": {
-          "type": "envelope",
-          "points": "POLYGON ((-73.9880304 40.7597602, -73.9898329 40.7572491, -73.9841359 40.7548109, -73.9822691 40.7573791, -73.9880304 40.7597602))",
-          "relation": "within"
-        }
+        "lat": 40.758049,
+        "lon": -73.9878585 
       }
     }
-  }  
+  }
 }
-```
+
